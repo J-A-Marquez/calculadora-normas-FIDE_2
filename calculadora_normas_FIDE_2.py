@@ -216,7 +216,7 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True):
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
         
-        if len(valid_matches) < 7: 
+        if len(valid_matches) < 8: 
             continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
@@ -391,7 +391,7 @@ def scan_candidates_for_norms(players_list, include_womens_titles=True):
     
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
-        if len(valid_matches) < 6: continue
+        if len(valid_matches) < 8: continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
         norms_to_test = []
