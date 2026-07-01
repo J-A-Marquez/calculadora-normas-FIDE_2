@@ -384,43 +384,41 @@ def get_candidate_requirements(norm_p, norm_type, players):
     }
 
 def scan_candidates_for_norms(players_list, include_womens_titles=True):
-    """Escanea jugadores y devuelve tanto los que ya tienen norma como los que la necesitan."""
     candidates = []
     title_hierarchy = {"GM": 4, "IM": 3, "WGM": 2, "WIM": 1, "": 0, "FM": 0, "WFM": 0, "CM": 0, "WCM": 0}
     
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
-        if len(valid_matches) < 6: 
-            continue
+        if len(valid_matches) < 6: continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
         norms_to_test = []
-        
         if player_title_level < 4: norms_to_test.append("GM")
         if player_title_level < 3: norms_to_test.append("IM")
-        
         if include_womens_titles:
             if player_title_level < 2: norms_to_test.append("WGM")
             if player_title_level < 1: norms_to_test.append("WIM")
             
         for norm_type in norms_to_test:
-            # Comprobamos si ya la tiene
+            # 1. Comprobamos si ya la tiene garantizada con los resultados actuales
             res_current = evaluate_norm(p, norm_type, players_list)
             
+            # 2. Comprobamos si la tiene garantizada incluso perdiendo la última (usando un rival de ELO mínimo 0)
+            # Esto es un test de "worst case scenario"
+            worst_case = evaluate_norm(p, norm_type, players_list, last_opp=Player(999, "WorstCase", 0, "", "XXX"))
+            
             if res_current and res_current["norm_achieved"]:
-                # NORMA YA GARANTIZADA: La añadimos al listado
+                status = "✅ GARANTIZADA"
+                if not (worst_case and worst_case["norm_achieved"]):
+                    status = "⚠️ CASI (Necesita tablas/victoria)"
+                
                 candidates.append({
-                    "ID": p.id,
-                    "Jugador": p.name,
-                    "Fed": p.federation,
-                    "Norma C.": norm_type,
-                    "Ptos": res_current["actual_score"],
-                    "Condición Deportiva": "✅ GARANTIZADA",
-                    "Título Rival": "-",
-                    "Bandera Rival": "-"
+                    "ID": p.id, "Jugador": p.name, "Fed": p.federation,
+                    "Norma C.": norm_type, "Ptos": res_current["actual_score"],
+                    "Condición Deportiva": status, "Título Rival": "-", "Bandera Rival": "-"
                 })
             else:
-                # NORMA AÚN EN JUEGO: Calculamos lo que necesita
+                # Si no la tiene, calculamos lo que necesita
                 reqs = get_candidate_requirements(p, norm_type, players_list)
                 if reqs:
                     candidates.append(reqs)
