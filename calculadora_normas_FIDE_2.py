@@ -68,7 +68,7 @@ dp_table = {
 }
 
 # =========================================================
-# LÓGICA DE CÁLCULO FIDE (Refactorizada)
+# LÓGICA DE CÁLCULO FIDE
 # =========================================================
 def evaluate_norm(norm_p, norm_type, players, last_opp=None):
     """Evalúa las condiciones matemáticas de una norma para un jugador dado."""
@@ -216,8 +216,8 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True):
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
         
-        # Filtro básico (Se ajustó el comentario para coincidir con la lógica o viceversa)
-        if len(valid_matches) < 6: 
+        # Filtro básico (mínimo 7 rondas)
+        if len(valid_matches) < 7: 
             continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
@@ -227,7 +227,9 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True):
         if player_title_level < 3: norms_to_test.append("IM")
         
         if include_womens_titles:
-            norms_to_test.extend(["WGM", "WIM"]) 
+            # Ahora sólo evalúa WGM/WIM si el nivel del título del jugador es inferior
+            if player_title_level < 2: norms_to_test.append("WGM")
+            if player_title_level < 1: norms_to_test.append("WIM")
         
         for norm_type in norms_to_test:
             res = evaluate_norm(p, norm_type, players_list)
@@ -258,7 +260,6 @@ uploaded_file = st.file_uploader("Sube aquí el archivo 'crosstable.txt' generad
 if uploaded_file is not None:
     players = []
     
-    # Manejo de decodificación mejorado por si el Vega exporta en otro formato
     try:
         content = uploaded_file.read().decode("utf-8")
     except UnicodeDecodeError:
@@ -286,7 +287,6 @@ if uploaded_file is not None:
 
     st.success("¡Archivo cargado correctamente!")
     
-    # Crear pestañas para organizar la interfaz
     tab_individual, tab_escaner = st.tabs(["🔍 Búsqueda Individual", "🚀 Escáner del Torneo"])
 
     # -----------------------------------------------------
@@ -351,7 +351,6 @@ if uploaded_file is not None:
         st.write("### 🤖 Búsqueda automática de normas")
         st.write("Analiza el torneo completo y encuentra a los jugadores que han logrado normas.")
         
-        # Selector para incluir o excluir normas femeninas
         modo_escaner = st.radio(
             "Selecciona el tipo de análisis:",
             ["Análisis Completo (GM, IM, WGM, WIM)", "Solo Títulos Absolutos (GM, IM)"],
@@ -370,4 +369,4 @@ if uploaded_file is not None:
                 st.dataframe(df, use_container_width=True, hide_index=True)
                 st.info("ℹ️ Vuelve a la pestaña 'Búsqueda Individual' si quieres ver el desglose detallado de alguno de estos jugadores.")
             else:
-                st.warning("No se ha detectado ninguna norma en este torneo (considerando jugadores con al menos 6 rondas válidas).")
+                st.warning("No se ha detectado ninguna norma en este torneo (considerando jugadores con al menos 7 rondas válidas).")
