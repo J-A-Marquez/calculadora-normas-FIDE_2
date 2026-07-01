@@ -364,12 +364,10 @@ def get_candidate_requirements(norm_p, norm_type, players):
     min_elo_draw = get_min_elo_for_score(0.5)
     min_elo_loss = get_min_elo_for_score(0.0)
 
-    # CORRECCIÓN: Si ni siquiera ganando llega a la performance, matemáticamente no es candidato
     if min_elo_win is None:
         return None
 
     result_needs = []
-    # CORRECCIÓN: Garantizar que la comprobación reconoce '0' (aunque en el loop empieza en 1000)
     if min_elo_loss is not None:
         result_needs.append(f"Derrota (ELO ≥ {min_elo_loss})")
     if min_elo_draw is not None:
@@ -410,9 +408,13 @@ def scan_candidates_for_norms(players_list, include_womens_titles=True):
             reqs = get_candidate_requirements(p, norm_type, players_list)
             
             if reqs:
-                res_current = evaluate_norm(p, norm_type, players_list)
-                if res_current and res_current["norm_achieved"]:
-                    reqs["Condición Deportiva"] = "✅ GARANTIZADA (Norma cumplida)"
+                # SE ELIMINÓ LA COMPROBACIÓN DE EVALUATE_NORM AQUÍ
+                # Si el jugador realmente tiene la norma garantizada incluso perdiendo, 
+                # la variable 'Derrota' estará en los requisitos devueltos por la función.
+                
+                # Opcional: Para que quede vistoso, lo resaltamos si puede permitirse perder.
+                if "Derrota" in reqs["Condición Deportiva"]:
+                    reqs["Condición Deportiva"] = "✅ GARANTIZADA (Incluso perdiendo) -> " + reqs["Condición Deportiva"]
                 
                 candidates.append(reqs)
                 
