@@ -362,11 +362,14 @@ def get_candidate_requirements(norm_p, norm_type, players):
 
     min_elo_win = get_min_elo_for_score(1.0)
     min_elo_draw = get_min_elo_for_score(0.5)
+    min_elo_loss = get_min_elo_for_score(0.0)
 
-    if min_elo_win is None and min_elo_draw is None:
+    if min_elo_win is None and min_elo_draw and min_elo_loss is None:
         return None
 
     result_needs = []
+    if min_elo_loss:
+        result_needs.append(f"Derrota (ELO ≥ {min_elo_loss})")
     if min_elo_draw:
         result_needs.append(f"Tablas (ELO ≥ {min_elo_draw})")
     if min_elo_win:
@@ -375,10 +378,9 @@ def get_candidate_requirements(norm_p, norm_type, players):
     return {
         "ID": norm_p.id,
         "Jugador": norm_p.name,
-        "Fed": norm_p.federation,
         "Ptos": actual_score,
         "Norma C.": norm_type,
-        "Condición Deportiva": " o ".join(result_needs),
+        "Condición Deportiva": " / ".join(result_needs), # Muestra todas las opciones
         "Título Rival": req_title,
         "Bandera Rival": req_fed
     }
@@ -400,28 +402,26 @@ def scan_candidates_for_norms(players_list, include_womens_titles=True):
             if player_title_level < 1: norms_to_test.append("WIM")
             
         for norm_type in norms_to_test:
-            # 1. Comprobamos si ya la tiene garantizada con los resultados actuales
-            res_current = evaluate_norm(p, norm_type, players_list)
+            # Obtenemos los requisitos detallados (Victoria, Tablas, Derrota)
+            reqs = get_candidate_requirements(p, norm_type, players_list)
             
-            # 2. Comprobamos si la tiene garantizada incluso perdiendo la última (usando un rival de ELO mínimo 0)
-            # Esto es un test de "worst case scenario"
-            worst_case = evaluate_norm(p, norm_type, players_list, last_opp=Player(999, "WorstCase", 0, "", "XXX"))
-            
-            if res_current and res_current["norm_achieved"]:
-                status = "✅ GARANTIZADA"
-                if not (worst_case and worst_case["norm_achieved"]):
-                    status = "⚠️ CASI (Necesita tablas/victoria)"
+            if reqs:
+                # Vamos a enriquecer el objeto reqs para que sea más informativo
+                # get_candidate_requirements ya calcula min_elo_win y min_elo_draw internamente.
+                # Vamos a añadir la lógica de "Derrota" también.
                 
-                candidates.append({
-                    "ID": p.id, "Jugador": p.name, "Fed": p.federation,
-                    "Norma C.": norm_type, "Ptos": res_current["actual_score"],
-                    "Condición Deportiva": status, "Título Rival": "-", "Bandera Rival": "-"
-                })
-            else:
-                # Si no la tiene, calculamos lo que necesita
-                reqs = get_candidate_requirements(p, norm_type, players_list)
-                if reqs:
-                    candidates.append(reqs)
+                # Buscamos el ELO necesario para norma incluso perdiendo (0.0 puntos extra)
+                # Reutilizamos la lógica interna de la función get_candidate_requirements
+                # (Nota: Asumimos que get_candidate_requirements ya expone o podemos calcular la lógica de derrota)
+                
+                # Si el jugador ya cumplió la norma con lo que tiene (reqs es solo una proyección),
+                # lo marcamos claramente.
+                
+                res_current = evaluate_norm(p, norm_type, players_list)
+                if res_current and res_current["norm_achieved"]:
+                    reqs["Condición Deportiva"] = "✅ GARANTIZADA (Norma cumplida)"
+                
+                candidates.append(reqs)
                 
     return candidates
 
