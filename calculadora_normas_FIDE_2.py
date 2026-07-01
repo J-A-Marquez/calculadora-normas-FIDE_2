@@ -384,7 +384,7 @@ def get_candidate_requirements(norm_p, norm_type, players):
     }
 
 def scan_candidates_for_norms(players_list, include_womens_titles=True):
-    """Escanea jugadores que aún no tienen norma pero podrían conseguirla."""
+    """Escanea jugadores y devuelve tanto los que ya tienen norma como los que la necesitan."""
     candidates = []
     title_hierarchy = {"GM": 4, "IM": 3, "WGM": 2, "WIM": 1, "": 0, "FM": 0, "WFM": 0, "CM": 0, "WCM": 0}
     
@@ -404,15 +404,26 @@ def scan_candidates_for_norms(players_list, include_womens_titles=True):
             if player_title_level < 1: norms_to_test.append("WIM")
             
         for norm_type in norms_to_test:
-            # Primero nos aseguramos de que no tenga YA la norma cumplida
+            # Comprobamos si ya la tiene
             res_current = evaluate_norm(p, norm_type, players_list)
-            if res_current and res_current["norm_achieved"]:
-                continue 
             
-            # Calculamos su proyección
-            reqs = get_candidate_requirements(p, norm_type, players_list)
-            if reqs:
-                candidates.append(reqs)
+            if res_current and res_current["norm_achieved"]:
+                # NORMA YA GARANTIZADA: La añadimos al listado
+                candidates.append({
+                    "ID": p.id,
+                    "Jugador": p.name,
+                    "Fed": p.federation,
+                    "Norma C.": norm_type,
+                    "Ptos": res_current["actual_score"],
+                    "Condición Deportiva": "✅ GARANTIZADA",
+                    "Título Rival": "-",
+                    "Bandera Rival": "-"
+                })
+            else:
+                # NORMA AÚN EN JUEGO: Calculamos lo que necesita
+                reqs = get_candidate_requirements(p, norm_type, players_list)
+                if reqs:
+                    candidates.append(reqs)
                 
     return candidates
 
