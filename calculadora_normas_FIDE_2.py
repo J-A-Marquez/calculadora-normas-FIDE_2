@@ -405,18 +405,16 @@ def scan_candidates_for_norms(players_list, include_womens_titles=True):
             if player_title_level < 1: norms_to_test.append("WIM")
             
         for norm_type in norms_to_test:
-            # Aquí llamamos directamente a la lógica de requisitos para la última ronda
+            # Obtenemos los requisitos calculados
             reqs = get_candidate_requirements(p, norm_type, players_list)
             
             if reqs:
-                # Si el jugador tiene condiciones de "Derrota", es que tiene margen
-                if "Derrota" in reqs["Condición Deportiva"]:
-                    reqs["Condición Deportiva"] = "✅ GARANTIZADA (Incluso perdiendo) -> " + reqs["Condición Deportiva"]
-                
+                # Al eliminar el bloque 'if "Derrota" in reqs...', 
+                # simplemente añadimos el resultado tal cual lo calcula la función,
+                # sin añadir prefijos, etiquetas ni decoraciones.
                 candidates.append(reqs)
                 
     return candidates
-
 # =========================================================
 # INTERFAZ WEB (STREAMLIT)
 # =========================================================
