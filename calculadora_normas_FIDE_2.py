@@ -534,7 +534,7 @@ if uploaded_file is not None:
                 if res["min_required_score"] < 0.0:
                     st.error(f"**7. Puntuación mínima** (Para TPR {res['target_performance']}) ➔ **❌ IMPOSIBLE** (La media de ELO es demasiado baja)")
                 else:
-                    st.write(f"**7. Puntuación mínima necesaria** (Para TPR {res['target_performance']}) (Requiere: {res['min_required_score']} ptos)  \n*Performance actual:* **{res['actual_performance']}** \n*Puntuación actual:* **{res['actual_score']} ptos** ➔ {st_status(res['cond_score'])}")
+                    st.write(f"**7. Puntuación mínima necesaria** (Para TPR {res['target_performance']}) (Requiere: {res['min_required_score']} ptos)  \n*Performance actual:* **{res['actual_performance']}**  \n*Puntuación actual:* **{res['actual_score']} ptos** ➔ {st_status(res['cond_score'])}")
                     
                     if res["norm_achieved"]:
                         st.balloons()
