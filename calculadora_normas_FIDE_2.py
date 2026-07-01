@@ -160,13 +160,13 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None):
     avg_elo = sum(opponent_elos) / n
     max_freq = max(federation_counts.values()) if federation_counts else 0
 
-    # 1. CÁLCULO DE LA PERFORMANCE REAL (CORREGIDO)
+    # Cálculo de la performance
     actual_p = actual_score / n if n > 0 else 0
     actual_p_idx = max(0, min(100, int(round(actual_p * 100.0))))
     actual_dp = dp_table.get(actual_p_idx, 0)
     actual_performance = round(avg_elo + actual_dp + 1e-9)
 
-    # 2. CÁLCULO DE LA PUNTUACIÓN MÍNIMA REQUERIDA
+    # Cálculo de la puntuación mínima requerida
     min_required_score = -1.0
     s = 0.0
     while s <= n:
@@ -208,14 +208,16 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None):
         "original_min_elo": original_min_elo, "elo_threshold": elo_threshold
     }
 
-def scan_all_players_for_norms(players_list):
+def scan_all_players_for_norms(players_list, include_womens_titles=True):
     """Escanea a todos los jugadores y devuelve una lista con las normas conseguidas."""
     successful_candidates = []
     title_hierarchy = {"GM": 4, "IM": 3, "WGM": 2, "WIM": 1, "": 0, "FM": 0, "WFM": 0, "CM": 0, "WCM": 0}
     
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
-        if len(valid_matches) < 9: # Filtro básico FIDE (mínimo 9 rondas)
+        
+        # Filtro básico (Se ajustó el comentario para coincidir con la lógica o viceversa)
+        if len(valid_matches) < 7: 
             continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
@@ -223,7 +225,9 @@ def scan_all_players_for_norms(players_list):
         
         if player_title_level < 4: norms_to_test.append("GM")
         if player_title_level < 3: norms_to_test.append("IM")
-        norms_to_test.extend(["WGM", "WIM"]) 
+        
+        if include_womens_titles:
+            norms_to_test.extend(["WGM", "WIM"]) 
         
         for norm_type in norms_to_test:
             res = evaluate_norm(p, norm_type, players_list)
@@ -253,7 +257,13 @@ uploaded_file = st.file_uploader("Sube aquí el archivo 'crosstable.txt' generad
 
 if uploaded_file is not None:
     players = []
-    content = uploaded_file.read().decode("utf-8")
+    
+    # Manejo de decodificación mejorado por si el Vega exporta en otro formato
+    try:
+        content = uploaded_file.read().decode("utf-8")
+    except UnicodeDecodeError:
+        content = uploaded_file.read().decode("ISO-8859-1")
+        
     lines = content.splitlines()
     player_re = re.compile(r"^\s*(\d+)\s+(.+?)\s+(\d+)\s+(?:([A-Z]{2,3})\s+)?([A-Z]{3})\s+[0-9.]+\s*\|")
     
@@ -339,11 +349,20 @@ if uploaded_file is not None:
     # -----------------------------------------------------
     with tab_escaner:
         st.write("### 🤖 Búsqueda automática de normas")
-        st.write("Presiona el botón para analizar el torneo completo y encontrar a todos los jugadores que han logrado normas.")
+        st.write("Analiza el torneo completo y encuentra a los jugadores que han logrado normas.")
         
-        if st.button("Escanear todo el torneo", type="primary"):
+        # Selector para incluir o excluir normas femeninas
+        modo_escaner = st.radio(
+            "Selecciona el tipo de análisis:",
+            ["Análisis Completo (GM, IM, WGM, WIM)", "Solo Títulos Absolutos (GM, IM)"],
+            horizontal=True
+        )
+        
+        incluir_femeninos = (modo_escaner == "Análisis Completo (GM, IM, WGM, WIM)")
+        
+        if st.button("Escanear torneo", type="primary"):
             with st.spinner('Analizando cuadro cruzado...'):
-                candidates = scan_all_players_for_norms(players)
+                candidates = scan_all_players_for_norms(players, include_womens_titles=incluir_femeninos)
                 
             if len(candidates) > 0:
                 st.success(f"¡Se han detectado {len(candidates)} posibles normas!")
@@ -351,4 +370,4 @@ if uploaded_file is not None:
                 st.dataframe(df, use_container_width=True, hide_index=True)
                 st.info("ℹ️ Vuelve a la pestaña 'Búsqueda Individual' si quieres ver el desglose detallado de alguno de estos jugadores.")
             else:
-                st.warning("No se ha detectado ninguna norma completa en este torneo (considerando jugadores con al menos 9 rondas válidas).")
+                st.warning("No se ha detectado ninguna norma en este torneo (considerando jugadores con al menos 7 rondas válidas).")
