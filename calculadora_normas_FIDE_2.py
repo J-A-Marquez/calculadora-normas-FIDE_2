@@ -217,7 +217,7 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True):
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
         
         # Filtro básico (mínimo 7 rondas)
-        if len(valid_matches) < 7: 
+        if len(valid_matches) < 6: 
             continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
@@ -369,4 +369,4 @@ if uploaded_file is not None:
                 st.dataframe(df, use_container_width=True, hide_index=True)
                 st.info("ℹ️ Vuelve a la pestaña 'Búsqueda Individual' si quieres ver el desglose detallado de alguno de estos jugadores.")
             else:
-                st.warning("No se ha detectado ninguna norma en este torneo (considerando jugadores con al menos 7 rondas válidas).")
+                st.warning("No se ha detectado ninguna norma en este torneo (considerando jugadores con al menos 6 rondas válidas).")
