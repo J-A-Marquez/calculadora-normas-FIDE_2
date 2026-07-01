@@ -342,7 +342,7 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
         p_idx = max(0, min(100, int(round(p_val * 100.0))))
         dp = dp_table.get(p_idx, 0)
         
-        for test_elo in range(1000, 3000):
+        for test_elo in range(1400, 3000):
             elos = opponent_elos.copy()
             elos.append(test_elo)
             
