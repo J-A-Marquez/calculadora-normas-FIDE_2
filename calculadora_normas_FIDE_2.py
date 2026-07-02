@@ -119,7 +119,7 @@ def evaluate_norm(norm_p, norm_type, players, hypothetical_opps=None, tournament
                     "Título": opp.title if opp.title else "-", "Fed": opp.federation, "Resultado": res_str
                 })
 
-    # MODIFICADO: Itera sobre los oponentes hipotéticos si los hay
+    # Itera sobre los oponentes hipotéticos si los hay
     if hypothetical_opps:
         for opp in hypothetical_opps:
             if opp:
@@ -317,7 +317,7 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
         p_idx = max(0, min(100, int(round(p_val * 100.0))))
         dp = dp_table.get(p_idx, 0)
         
-        for test_elo in range(1400, 3000):
+        for test_elo in range(1400, 2850):
             elos = opponent_elos.copy()
             elos.append(test_elo)
             
@@ -448,7 +448,7 @@ def get_candidate_requirements_2_rounds(norm_p, norm_type, players, tournament_e
         p_idx = max(0, min(100, int(round(p_val * 100.0))))
         dp = dp_table.get(p_idx, 0)
         
-        for test_avg_elo in range(1400, 3000):
+        for test_avg_elo in range(1400, 2850):
             elos = opponent_elos.copy()
             elos.append(test_avg_elo)
             elos.append(test_avg_elo)
@@ -465,8 +465,8 @@ def get_candidate_requirements_2_rounds(norm_p, norm_type, players, tournament_e
         return None
 
     scenarios = [
-        (2.0, "2V"), (1.5, "1V+1T"), (1.0, "1V+1D o 2T"), 
-        (0.5, "1T+1D"), (0.0, "2D")
+        (2.0, "2.0"), (1.5, "1.5"), (1.0, "1.0"), 
+        (0.5, "0.5"), (0.0, "0.0")
     ]
 
     result_needs = []
