@@ -607,8 +607,8 @@ if uploaded_file is not None:
         "🔮 Estimación Próximas Rondas"
     ])
 
-    # -----------------------------------------------------
-    # PESTAÑA 1: MODO INDIVIDUAL
+# -----------------------------------------------------
+    # PESTAÑA 1: MODO INDIVIDUAL (AJUSTADA)
     # -----------------------------------------------------
     with tab_individual:
         player_options = {p.id: f"{p.id} - {p.name} (ELO: {p.elo})" for p in players}
@@ -622,8 +622,8 @@ if uploaded_file is not None:
 
         norm_type = st.radio("¿Qué tipo de norma deseas evaluar?", available_norms, horizontal=True)
 
-        # MODIFICADO: Selector numérico (0, 1 o 2 rivales) para cálculos hipotéticos
-        num_hypothetical = st.selectbox("¿Cuántos rivales hipotéticos extra deseas añadir?", [0, 1, 2], index=0)
+        # MODIFICADO: Uso de botones (radio) para seleccionar rivales extra
+        num_hypothetical = st.radio("¿Añadir rivales hipotéticos extra para cálculos?", [0, 1, 2], horizontal=True)
         
         hypothetical_opps = []
         if num_hypothetical >= 1:
@@ -635,12 +635,12 @@ if uploaded_file is not None:
             hypothetical_opps.append(get_player(opp2_id, players))
 
         if norm_p:
-            # MODIFICADO: Pasamos la lista 'hypothetical_opps' en vez de 'last_opp'
             res = evaluate_norm(norm_p, norm_type, players, hypothetical_opps, tournament_exemption)
             
             if res is None:
                 st.error("El jugador seleccionado no posee partidas válidas computables.")
             else:
+                # ... (El resto de la lógica de visualización del informe permanece igual)
                 def st_status(met):
                     return "✅ CUMPLIDO" if met else "❌ NO CUMPLIDO"
 
