@@ -1,7 +1,5 @@
 import re
 import math
-import requests
-from bs4 import BeautifulSoup
 import streamlit as st
 import pandas as pd
 
@@ -25,8 +23,8 @@ class Player:
         self.title = title
         self.federation = federation
         self.matches = []
-        # 'M' = Masculino/Hombre, 'F' = Femenino/Mujer, 'U' = Desconocido
-        self.gender = "U" 
+        # NUEVO: Detección automática inicial basada en el título
+        self.is_female = title in ["WGM", "WIM", "WFM", "WCM"]
 
 def get_title_rank(title):
     ranks = {"GM": 6, "IM": 5, "WGM": 4, "WIM": 3, "FM": 2, "WFM": 1}
@@ -72,75 +70,11 @@ dp_table = {
 }
 
 # =========================================================
-# CONSULTA DE GÉNERO DESDE LA FIDE
-# =========================================================
-@st.cache_data(show_spinner=False)
-def scrape_fide_gender(player_name):
-    """Consulta la web de la FIDE para intentar extraer el género de un jugador por su nombre."""
-    # Limpiamos el nombre para la URL
-    search_query = player_name.replace(" ", "+")
-    url = f"https://ratings.fide.com/search.phtml?search={search_query}"
-    
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=8)
-        if response.status_code == 200:
-            html = response.text.lower()
-            
-            # Si redirige directamente a una ficha de perfil o contiene datos directos
-            if "profile" in response.url or "sex:" in html:
-                if "sex: female" in html or "gender: female" in html:
-                    return "F"
-                if "sex: male" in html or "gender: male" in html:
-                    return "M"
-            
-            # Si devuelve una tabla de resultados de búsqueda, analizamos las filas
-            soup = BeautifulSoup(response.text, 'html.parser')
-            for row in soup.find_all('tr'):
-                cells = [c.get_text().strip() for c in row.find_all(['td', 'th'])]
-                # Habitualmente la columna de sexo en la tabla de búsqueda contiene 'M' o 'F' de forma aislada
-                for cell in cells:
-                    if cell == "F":
-                        return "F"
-                    elif cell == "M":
-                        return "M"
-    except Exception:
-        pass
-    return "U"
-
-def auto_detect_genders(players_list):
-    """Asigna géneros detectando títulos o consultando la web de la FIDE."""
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for idx, p in enumerate(players_list):
-        status_text.text(f"Verificando perfil FIDE de: {p.name}")
-        
-        # Regla 1: Si ya posee un título exclusivamente femenino, es mujer
-        if p.title and p.title.startswith("W"):
-            p.gender = "F"
-        else:
-            # Regla 2: Consultar la web oficial de la FIDE
-            p.gender = scrape_fide_gender(p.name)
-            
-        progress_bar.progress((idx + 1) / len(players_list))
-        
-    progress_bar.empty()
-    status_text.empty()
-
-# =========================================================
 # LÓGICA DE CÁLCULO FIDE
 # =========================================================
 def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemption=False):
     """Evalúa las condiciones matemáticas de una norma para un jugador dado."""
     
-    # Descarte absoluto si un hombre intenta evaluar un título de mujer
-    if norm_p.gender == "M" and norm_type in ["WGM", "WIM"]:
-        return None
-
     if norm_type == "GM":
         target_rank, elo_threshold, elo_target, target_performance = 6, 2200, 2380, 2599.5
     elif norm_type == "IM":
@@ -287,7 +221,6 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True, tournam
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
         
         if len(valid_matches) < 8: 
-            return_null = True
             continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
@@ -296,8 +229,8 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True, tournam
         if player_title_level < 4: norms_to_test.append("GM")
         if player_title_level < 3: norms_to_test.append("IM")
         
-        # Si el jugador es un hombre ('M'), nunca se evalúan títulos femeninos
-        if include_womens_titles and p.gender != "M":
+        # NUEVO: Validamos que la persona sea mujer además del toggle global
+        if include_womens_titles and p.is_female:
             if player_title_level < 2: norms_to_test.append("WGM")
             if player_title_level < 1: norms_to_test.append("WIM")
         
@@ -319,10 +252,6 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True, tournam
 def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=False):
     """Estima qué necesita un jugador en la última ronda para conseguir norma."""
     
-    # Descarte inmediato si es hombre buscando norma femenina
-    if norm_p.gender == "M" and norm_type in ["WGM", "WIM"]:
-        return None
-
     if norm_type == "GM":
         target_rank, elo_threshold, elo_target, target_performance = 6, 2200, 2380, 2599.5
     elif norm_type == "IM":
@@ -473,8 +402,8 @@ def scan_candidates_for_norms(players_list, include_womens_titles=True, tourname
         if player_title_level < 4: norms_to_test.append("GM")
         if player_title_level < 3: norms_to_test.append("IM")
         
-        # Restricción de género para el scanner preventivo
-        if include_womens_titles and p.gender != "M":
+        # NUEVO: Comprobamos si es mujer antes de añadir los tests de WGM/WIM
+        if include_womens_titles and p.is_female:
             if player_title_level < 2: norms_to_test.append("WGM")
             if player_title_level < 1: norms_to_test.append("WIM")
             
@@ -497,88 +426,69 @@ st.write("Esta herramienta analiza el cuadro cruzado de un torneo suizo para ver
 uploaded_file = st.file_uploader("Sube aquí el archivo 'crosstable.txt' generado por el programa de emparejamientos (Vega):", type=["txt"])
 
 if uploaded_file is not None:
-    # Usar session_state para mantener la lista de jugadores cargada y con géneros editados
-    if "players_list" not in st.session_state:
-        players = []
-        try:
-            content = uploaded_file.read().decode("utf-8")
-        except UnicodeDecodeError:
-            content = uploaded_file.read().decode("ISO-8859-1")
-            
-        lines = content.splitlines()
-        player_re = re.compile(r"^\s*(\d+)\s+(.+?)\s+(\d+)\s+(?:([A-Z]{2,3})\s+)?([A-Z]{3})\s+[0-9.]+\s*\|")
-        
-        for line in lines:
-            match = player_re.search(line)
-            if match:
-                p_id = int(match.group(1))
-                name = match.group(2).strip()
-                elo = int(match.group(3))
-                title = match.group(4).strip() if match.group(4) else ""
-                federation = match.group(5).strip()
-                p = Player(p_id, name, elo, title, federation)
-                players.append(p)
-            
-            tokens = line.split()
-            for token in tokens:
-                m = parse_match_token(token)
-                if m.is_valid and players:
-                    players[-1].matches.append(m)
-                    
-        # Ejecutar la verificación automatizada de género una sola vez al cargar el archivo
-        with st.spinner("Consultando base de datos y perfiles FIDE para verificar géneros (Hombres/Mujeres)..."):
-            auto_detect_genders(players)
-            
-        st.session_state.players_list = players
-        st.success("¡Archivo cargado y base de datos FIDE consultada correctamente!")
+    players = []
     
-    players = st.session_state.players_list
+    try:
+        content = uploaded_file.read().decode("utf-8")
+    except UnicodeDecodeError:
+        content = uploaded_file.read().decode("ISO-8859-1")
+        
+    lines = content.splitlines()
+    player_re = re.compile(r"^\s*(\d+)\s+(.+?)\s+(\d+)\s+(?:([A-Z]{2,3})\s+)?([A-Z]{3})\s+[0-9.]+\s*\|")
+    
+    for line in lines:
+        match = player_re.search(line)
+        if match:
+            p_id = int(match.group(1))
+            name = match.group(2).strip()
+            elo = int(match.group(3))
+            title = match.group(4).strip() if match.group(4) else ""
+            federation = match.group(5).strip()
+            p = Player(p_id, name, elo, title, federation)
+            players.append(p)
+        
+        tokens = line.split()
+        for token in tokens:
+            m = parse_match_token(token)
+            if m.is_valid and players:
+                players[-1].matches.append(m)
 
+    st.success("¡Archivo cargado correctamente!")
+    
     # -----------------------------------------------------
-    # PANEL DE EDICIÓN Y CONTROL DE GÉNEROS
+    # NUEVO: INTERFAZ PARA DEFINIR JUGADORAS FEMENINAS
     # -----------------------------------------------------
     st.markdown("---")
-    st.write("### 👥 Control y Verificación de Género de los Jugadores")
-    st.write("Abajo puedes ver el género asignado automáticamente por la app tras leer los títulos o consultar la FIDE. **Si ves algún valor como 'U' (Desconocido) debido a bloqueos de red o errores de coincidencia, puedes corregirlo directamente en la tabla:**")
+    st.write("### 👩 Gestión de Categoría Femenina")
+    st.write("El sistema ha detectado automáticamente a las jugadoras con títulos femeninos (WGM, WIM, WFM, WCM). Puedes buscar y añadir manualmente a jugadoras sin título o con título absoluto para que puedan ser evaluadas para normas WGM/WIM.")
     
-    # Preparar DataFrame para st.data_editor
-    gender_data = [{
-        "Rk": p.id,
-        "Jugador": p.name,
-        "ELO": p.elo,
-        "Título": p.title if p.title else "-",
-        "Fed": p.federation,
-        "Género (M/F/U)": p.gender
-    } for p in players]
+    player_options_dict = {p.id: f"{p.id} - {p.name} (ELO: {p.elo})" for p in players}
+    preselected_females = [p.id for p in players if p.is_female]
     
-    df_genders = pd.DataFrame(gender_data)
-    
-    # Permitir al usuario editar únicamente la columna de Género
-    edited_df = st.data_editor(
-        df_genders, 
-        disabled=["Rk", "Jugador", "ELO", "Título", "Fed"], 
-        use_container_width=True,
-        hide_index=True
+    selected_female_ids = st.multiselect(
+        "Selecciona las jugadoras femeninas del torneo:",
+        options=list(player_options_dict.keys()),
+        default=preselected_females,
+        format_func=lambda x: player_options_dict[x]
     )
     
-    # Sincronizar los cambios del editor interactivo con nuestros objetos Player
-    for _, row in edited_df.iterrows():
-        p_obj = get_player(row["Rk"], players)
-        if p_obj:
-            # Aseguramos guardar el formato en mayúsculas
-            p_obj.gender = str(row["Género (M/F/U)"]).upper().strip()
-
+    # Actualizamos el objeto Player según la selección del usuario
+    for p in players:
+        p.is_female = (p.id in selected_female_ids)
+    
     # -----------------------------------------------------
     # CÁLCULO DE LA EXCEPCIÓN FIDE (TORNEOS INTERNACIONALES)
     # -----------------------------------------------------
     st.markdown("---")
     st.write("### 🌍 Configuración y Normativa del Torneo")
     
+    # Inferimos la federación organizadora por mayoría
     all_feds = [p.federation for p in players]
     inferred_host_fed = max(set(all_feds), key=all_feds.count) if all_feds else ""
     
     host_fed = st.text_input("Federación organizadora (Host Federation):", value=inferred_host_fed, max_chars=3)
     
+    # Evaluamos la excepción
     foreign_rated_players = [p for p in players if p.federation != host_fed and p.elo > 0]
     foreign_feds = set(p.federation for p in foreign_rated_players)
     wim_plus_titles = {"GM", "IM", "WGM", "WIM"}
@@ -603,63 +513,65 @@ if uploaded_file is not None:
     # PESTAÑA 1: MODO INDIVIDUAL
     # -----------------------------------------------------
     with tab_individual:
-        player_options = {p.id: f"{p.id} - {p.name} (ELO: {p.elo}) [{p.gender}]" for p in players}
+        player_options = {p.id: f"{p.id} - {p.name} (ELO: {p.elo})" for p in players}
         
         norm_player_id = st.selectbox("Selecciona el jugador que busca la norma:", options=list(player_options.keys()), format_func=lambda x: player_options[x])
         norm_p = get_player(norm_player_id, players)
 
-        norm_type = st.radio("¿Qué tipo de norma deseas evaluar?", ["GM", "IM", "WGM", "WIM"], horizontal=True)
+        # NUEVO: Solo muestra normas femeninas si el jugador está marcado como mujer
+        available_norms = ["GM", "IM"]
+        if norm_p and norm_p.is_female:
+            available_norms.extend(["WGM", "WIM"])
 
-        if norm_p and norm_p.gender == "M" and norm_type in ["WGM", "WIM"]:
-            st.error(f"❌ No se puede evaluar la norma de {norm_type} para {norm_p.name} porque está registrado como hombre ('M'). Los hombres no pueden optar a títulos femeninos.")
-        else:
-            add_opp = st.checkbox("¿Deseas añadir un rival extra manualmente para cálculos hipotéticos?")
-            last_opp = None
-            if add_opp:
-                last_opponent_id = st.selectbox("Selecciona el rival adicional:", options=list(player_options.keys()), format_func=lambda x: player_options[x], key="last_rival")
-                last_opp = get_player(last_opponent_id, players)
+        norm_type = st.radio("¿Qué tipo de norma deseas evaluar?", available_norms, horizontal=True)
 
-            if norm_p:
-                res = evaluate_norm(norm_p, norm_type, players, last_opp, tournament_exemption)
+        add_opp = st.checkbox("¿Deseas añadir un rival extra manualmente para cálculos hipotéticos?")
+        last_opp = None
+        if add_opp:
+            last_opponent_id = st.selectbox("Selecciona el rival adicional:", options=list(player_options.keys()), format_func=lambda x: player_options[x], key="last_rival")
+            last_opp = get_player(last_opponent_id, players)
+
+        if norm_p:
+            res = evaluate_norm(norm_p, norm_type, players, last_opp, tournament_exemption)
+            
+            if res is None:
+                st.error("El jugador seleccionado no posee partidas válidas computables.")
+            else:
+                def st_status(met):
+                    return "✅ CUMPLIDO" if met else "❌ NO CUMPLIDO"
+
+                st.markdown("---")
+                st.header(f"Informe de requisitos: Norma de {norm_type}")
+                st.subheader(f"Jugador: {norm_p.name} ({norm_p.federation})")
                 
-                if res is None:
-                    st.error("El jugador seleccionado no posee partidas válidas computables.")
+                st.write("### 📋 Listado de rivales")
+                st.table(res["opponent_details"])
+                
+                if res["elo_adjusted"]:
+                    st.warning(f"⚠️ **Umbral FIDE aplicado:** El rival con menor ELO ({res['original_min_elo']}) ha sido ajustado a {res['elo_threshold']} para el cálculo del ELO medio.")
+
+                st.write("### 📊 Verificación de condiciones FIDE")
+                st.write(f"**1. ELO medio de los rivales** (Mínimo: {res['elo_target']})  \n*Actual:* **{res['avg_elo']:.2f}** ➔ {st_status(res['cond_elo'])}")
+                st.write(f"**2. Rivales titulados categoría {norm_type}+** (Mínimo: {res['req_cat_min']})  \n*Actual:* **{res['category_titles']}** ➔ {st_status(res['cond_cat_titles'])}")
+                st.write(f"**3. Rivales titulados totales** (Mínimo: {res['req_tot_min']})  \n*Actual:* **{res['valid_titles_total']}** ➔ {st_status(res['cond_tot_titles'])}")
+                st.write(f"**4. Rivales de la misma federación ({norm_p.federation})** (Máximo: {res['req_fed_player_max']})  \n*Actual:* **{res['same_fed_as_player']}** ➔ {st_status(res['cond_fed_player'])}")
+                st.write(f"**5. Rivales de la federación más común** (Máximo: {res['req_fed_any_max']})  \n*Actual:* **{res['max_freq']}** ➔ {st_status(res['cond_fed_any'])}")
+                
+                if tournament_exemption:
+                    st.write(f"**6. Federaciones diferentes** (Excepción torneo internacional aplicada)  \n*Actual:* **{res['num_feds']}** ➔ ✅ CUMPLIDO")
                 else:
-                    def st_status(met):
-                        return "✅ CUMPLIDO" if met else "❌ NO CUMPLIDO"
-
-                    st.markdown("---")
-                    st.header(f"Informe de requisitos: Norma de {norm_type}")
-                    st.subheader(f"Jugador: {norm_p.name} ({norm_p.federation}) - Género: {norm_p.gender}")
+                    st.write(f"**6. Federaciones diferentes** (Mínimo: {res['req_fed_diff_min']})  \n*Actual:* **{res['num_feds']}** ➔ {st_status(res['cond_fed_diff'])}")
+                
+                if res["min_required_score"] < 0.0:
+                    st.error(f"**7. Puntuación mínima** (Para TPR {res['target_performance']}) ➔ **❌ IMPOSIBLE** (La media de ELO es demasiado baja)")
+                else:
+                    st.write(f"**7. Puntuación mínima necesaria** (Para TPR {res['target_performance']}) (Requiere: {res['min_required_score']} ptos)  \n*Performance actual:* **{res['actual_performance']}**  \n*Puntuación actual:* **{res['actual_score']} ptos** ➔ {st_status(res['cond_score'])}")
                     
-                    st.write("### 📋 Listado de rivales")
-                    st.table(res["opponent_details"])
-                    
-                    if res["elo_adjusted"]:
-                        st.warning(f"⚠️ **Umbral FIDE aplicado:** El rival con menor ELO ({res['original_min_elo']}) ha sido ajustado a {res['elo_threshold']} para el cálculo del ELO medio.")
-
-                    st.write("### 📊 Verificación de condiciones FIDE")
-                    st.write(f"**1. ELO medio de los rivales** (Mínimo: {res['elo_target']})  \n*Actual:* **{res['avg_elo']:.2f}** ➔ {st_status(res['cond_elo'])}")
-                    st.write(f"**2. Rivales titulados categoría {norm_type}+** (Mínimo: {res['req_cat_min']})  \n*Actual:* **{res['category_titles']}** ➔ {st_status(res['cond_cat_titles'])}")
-                    st.write(f"**3. Rivales titulados totales** (Mínimo: {res['req_tot_min']})  \n*Actual:* **{res['valid_titles_total']}** ➔ {st_status(res['cond_tot_titles'])}")
-                    st.write(f"**4. Rivales de la misma federación ({norm_p.federation})** (Máximo: {res['req_fed_player_max']})  \n*Actual:* **{res['same_fed_as_player']}** ➔ {st_status(res['cond_fed_player'])}")
-                    st.write(f"**5. Rivales de la federación más común** (Máximo: {res['req_fed_any_max']})  \n*Actual:* **{res['max_freq']}** ➔ {st_status(res['cond_fed_any'])}")
-                    
-                    if tournament_exemption:
-                        st.write(f"**6. Federaciones diferentes** (Excepción torneo internacional aplicada)  \n*Actual:* **{res['num_feds']}** ➔ ✅ CUMPLIDO")
+                    if res["norm_achieved"]:
+                        st.balloons()
+                        st.success(f"🎉 ¡El jugador cumple TODOS los requisitos para optar a la norma de {norm_type}!")
                     else:
-                        st.write(f"**6. Federaciones diferentes** (Mínimo: {res['req_fed_diff_min']})  \n*Actual:* **{res['num_feds']}** ➔ {st_status(res['cond_fed_diff'])}")
-                    
-                    if res["min_required_score"] < 0.0:
-                        st.error(f"**7. Puntuación mínima** (Para TPR {res['target_performance']}) ➔ **❌ IMPOSIBLE** (La media de ELO es demasiado baja)")
-                    else:
-                        st.write(f"**7. Puntuación mínima necesaria** (Para TPR {res['target_performance']}) (Requiere: {res['min_required_score']} ptos)  \n*Performance actual:* **{res['actual_performance']}**  \n*Puntuación actual:* **{res['actual_score']} ptos** ➔ {st_status(res['cond_score'])}")
-                        
-                        if res["norm_achieved"]:
-                            st.balloons()
-                            st.success(f"🎉 ¡El jugador cumple TODOS los requisitos para optar a la norma de {norm_type}!")
-                        else:
-                            st.info("💡 Revisa las condiciones marcadas con '❌' para ver qué falla en la norma.")
+                        st.info("💡 Revisa las condiciones marcadas con '❌' para ver qué falla en la norma.")
 
     # -----------------------------------------------------
     # PESTAÑA 2: ESCÁNER DEL TORNEO (NORMAS CONSEGUIDAS)
@@ -670,12 +582,12 @@ if uploaded_file is not None:
         
         modo_escaner = st.radio(
             "Selecciona el tipo de análisis:",
-            ["Análisis Completo (Filtro de género activo)", "Solo Títulos Absolutos (GM, IM)"],
+            ["Análisis Completo (GM, IM, WGM, WIM)", "Solo Títulos Absolutos (GM, IM)"],
             horizontal=True,
             key="radio_cumplidas"
         )
         
-        incluir_femeninos = (modo_escaner == "Análisis Completo (Filtro de género activo)")
+        incluir_femeninos = (modo_escaner == "Análisis Completo (GM, IM, WGM, WIM)")
         
         if st.button("Buscar normas cumplidas", type="primary"):
             with st.spinner('Analizando cuadro cruzado...'):
@@ -683,6 +595,7 @@ if uploaded_file is not None:
                 
             if len(candidates) > 0:
                 st.success(f"¡Se han detectado {len(candidates)} normas cumplidas!")
+
                 df = pd.DataFrame(candidates)
                 st.dataframe(df, use_container_width=True, hide_index=True)
             else:
@@ -693,16 +606,16 @@ if uploaded_file is not None:
     # -----------------------------------------------------
     with tab_candidatos:
         st.write("### 🔮 Candidatos a falta de 1 ronda")
-        st.write("Identifica a los jugadores que aún no tienen norma, pero que **podrían conseguirla si juegan una partida más**. Útil antes de publicar los emparejamientos de la última ronda.")
+        st.write("Identifica a los jugadores que aún no tienen norma, pero que **podrían conseguirla si juegan una partida más**. Útil antes de publicar los emparejamientos de la última ronda para saber a quién hacerle seguimiento.")
         
         modo_escaner_cand = st.radio(
             "Selecciona el tipo de análisis:",
-            ["Análisis Completo (Filtro de género activo)", "Solo Títulos Absolutos (GM, IM)"],
+            ["Análisis Completo (GM, IM, WGM, WIM)", "Solo Títulos Absolutos (GM, IM)"],
             horizontal=True,
             key="radio_candidatos"
         )
         
-        incluir_femeninos_cand = (modo_escaner_cand == "Análisis Completo (Filtro de género activo)")
+        incluir_femeninos_cand = (modo_escaner_cand == "Análisis Completo (GM, IM, WGM, WIM)")
         
         if st.button("Buscar candidatos", type="primary"):
             with st.spinner('Proyectando escenarios para la última ronda...'):
