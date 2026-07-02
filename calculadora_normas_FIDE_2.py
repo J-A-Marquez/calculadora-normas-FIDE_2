@@ -465,8 +465,7 @@ def get_candidate_requirements_2_rounds(norm_p, norm_type, players, tournament_e
         return None
 
     scenarios = [
-        (2.0, "2.0"), (1.5, "1.5"), (1.0, "1.0"), 
-        (0.5, "0.5"), (0.0, "0.0")
+        (0.0, "2D"), (0.5, "1T+1D"), (1.0, "1V+1D/2T"), (1.5, "1V+1T"), (2.0, "2V")
     ]
 
     result_needs = []
