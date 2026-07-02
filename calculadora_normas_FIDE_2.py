@@ -61,9 +61,9 @@ dp_table = {
     60: 72,  59: 65,  58: 57,  57: 50,  56: 43,  55: 36,  54: 29,  53: 21,  52: 14,  51: 7,
     50: 0,
     49: -7,  48: -14, 47: -21, 46: -29, 45: -36, 44: -43, 43: -50, 42: -57, 41: -65, 40: -72,
-    39: -80, 38: -87, 37: -95, 36: -102,35: -110,34: -117,33: -125,32: -133,31: -141,30: -149,
-    29: -158,28: -166,27: -175,26: -184,25: -193,24: -202,23: -211,22: -220,21: -230,20: -240,
-    19: -251,18: -262,17: -273,16: -284,15: -296,14: -309,13: -322,12: -336,11: -351,10: -366,
+    39: -80, 38: -87, 37: -95, 36: -102, 35: -110, 34: -117, 33: -125, 32: -133, 31: -141, 30: -149,
+    29: -158, 28: -166, 27: -175, 26: -184, 25: -193, 24: -202, 23: -211, 22: -220, 21: -230, 20: -240,
+    19: -251, 18: -262, 17: -273, 16: -284, 15: -296, 14: -309, 13: -322, 12: -336, 11: -351, 10: -366,
     9: -383,  8: -401,  7: -422,  6: -444,  5: -470,  4: -501,  3: -538,  2: -589,  1: -677,  0: -800
 }
 
@@ -118,7 +118,7 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
                     res_str = "0.5"
                     
                 opponent_details.append({
-                    "ID": opp.id, "Nombre": opp.name, "ELO": opp.elo, 
+                    "Rk": opp.id, "Nombre": opp.name, "ELO": opp.elo, 
                     "Título": opp.title if opp.title else "-", "Fed": opp.federation, "Resultado": res_str
                 })
 
@@ -235,13 +235,13 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True, tournam
             res = evaluate_norm(p, norm_type, players_list, tournament_exemption=tournament_exemption)
             if res and res["norm_achieved"]:
                 successful_candidates.append({
-                    "ID": p.id,
+                    "Rk": p.id,
                     "Jugador": p.name,
                     "Fed": p.federation,
                     "Norma": norm_type,
-                    "Puntos": res["actual_score"],
-                    "TPR": res["actual_performance"],
-                    "Rc": round(res["avg_elo"], 1)
+                    "Ptos": res["actual_score"],
+                    "Performance": res["actual_performance"],
+                    "ARO": round(res["avg_elo"], 1)
                 })
                 
     return successful_candidates
@@ -377,11 +377,11 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
         return None
 
     return {
-        "ID": norm_p.id,
+        "Rk": norm_p.id,
         "Jugador": norm_p.name,
         "Ptos": actual_score,
-        "Norma C.": norm_type,
-        "Condición Deportiva": " / ".join(result_needs),
+        "Norma": norm_type,
+        "Resultado necesario": " / ".join(result_needs),
         "Título Rival": req_title,
         "Bandera Rival": req_fed
     }
@@ -471,9 +471,9 @@ if uploaded_file is not None:
     tournament_exemption = (len(foreign_rated_players) >= 20 and len(foreign_feds) >= 3 and titled_foreign_count >= 10)
     
     if tournament_exemption:
-        st.success(f"✅ **Excepción FIDE aplicable:** Hay {len(foreign_rated_players)} extranjeros con ELO, de {len(foreign_feds)} federaciones, y {titled_foreign_count} con título WIM+. **Se ignora el requisito de haber jugado contra 3 federaciones.**")
+        st.success(f"✅ **Excepción FIDE 1.4.3d aplicable:** Hay {len(foreign_rated_players)} extranjeros con ELO, de {len(foreign_feds)} federaciones, y {titled_foreign_count} con título WIM+. **Se ignora el requisito de haber jugado contra 3 federaciones.**")
     else:
-        st.info(f"ℹ️ **Excepción FIDE NO aplicable:** El torneo cuenta con {len(foreign_rated_players)} extranjeros con ELO (mín. 20), de {len(foreign_feds)} federaciones (mín. 3), y {titled_foreign_count} con título WIM+ (mín. 10).")
+        st.info(f"ℹ️ **Excepción FIDE 1.4.3d NO aplicable:** El torneo cuenta con {len(foreign_rated_players)} extranjeros con ELO (mín. 20), de {len(foreign_feds)} federaciones (mín. 3), y {titled_foreign_count} con título WIM+ (mín. 10).")
 
     st.markdown("---")
     
