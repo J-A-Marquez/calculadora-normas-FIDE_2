@@ -339,9 +339,9 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
     if min_elo_win is None: return None
 
     result_needs = []
-    if min_elo_loss is not None: result_needs.append(f"Derrota (ELO ≥ {min_elo_loss})")
-    if min_elo_draw is not None: result_needs.append(f"Tablas (ELO ≥ {min_elo_draw})")
-    if min_elo_win is not None: result_needs.append(f"Victoria (ELO ≥ {min_elo_win})")
+    if min_elo_loss is not None: result_needs.append(f"1D (ELO ≥ {min_elo_loss})")
+    if min_elo_draw is not None: result_needs.append(f"1T (ELO ≥ {min_elo_draw})")
+    if min_elo_win is not None: result_needs.append(f"1V (ELO ≥ {min_elo_win})")
 
     if not result_needs: return None
 
@@ -350,7 +350,7 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
         "Jugador": norm_p.name,
         "Ptos": actual_score,
         "Norma": norm_type,
-        "Resultado necesario": " / ".join(result_needs),
+        "Resultado necesario": " // ".join(result_needs),
         "Títulos req.": req_title,
         "Banderas req.": req_fed
     }
@@ -481,7 +481,7 @@ def get_candidate_requirements_2_rounds(norm_p, norm_type, players, tournament_e
         "Jugador": norm_p.name,
         "Ptos": actual_score,
         "Norma": norm_type,
-        "Resultado necesario": " / ".join(result_needs),
+        "Resultado necesario": " // ".join(result_needs),
         "Títulos req.": req_title,
         "Banderas req.": req_fed
     }
