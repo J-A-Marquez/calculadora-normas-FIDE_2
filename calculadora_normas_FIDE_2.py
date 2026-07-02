@@ -70,7 +70,8 @@ dp_table = {
 # =========================================================
 # LÓGICA DE CÁLCULO FIDE
 # =========================================================
-def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemption=False):
+# MODIFICADO: Acepta una lista 'hypothetical_opps' en lugar de 'last_opp'
+def evaluate_norm(norm_p, norm_type, players, hypothetical_opps=None, tournament_exemption=False):
     if norm_type == "GM":
         target_rank, elo_threshold, elo_target, target_performance = 6, 2200, 2380, 2599.5
     elif norm_type == "IM":
@@ -118,22 +119,25 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
                     "Título": opp.title if opp.title else "-", "Fed": opp.federation, "Resultado": res_str
                 })
 
-    if last_opp:
-        opponent_elos.append(last_opp.elo)
-        rank = get_title_rank(last_opp.title)
-        if rank > 0:
-            valid_titles_total += 1
-            if rank >= target_rank:
-                category_titles += 1
-                
-        federation_counts[last_opp.federation] = federation_counts.get(last_opp.federation, 0) + 1
-        if last_opp.federation == norm_p.federation:
-            same_fed_as_player += 1
+    # MODIFICADO: Itera sobre los oponentes hipotéticos si los hay
+    if hypothetical_opps:
+        for opp in hypothetical_opps:
+            if opp:
+                opponent_elos.append(opp.elo)
+                rank = get_title_rank(opp.title)
+                if rank > 0:
+                    valid_titles_total += 1
+                    if rank >= target_rank:
+                        category_titles += 1
+                        
+                federation_counts[opp.federation] = federation_counts.get(opp.federation, 0) + 1
+                if opp.federation == norm_p.federation:
+                    same_fed_as_player += 1
 
-        opponent_details.append({
-            "ID": last_opp.id, "Nombre": last_opp.name, "ELO": last_opp.elo, 
-            "Título": last_opp.title if last_opp.title else "-", "Fed": last_opp.federation, "Resultado": "?"
-        })
+                opponent_details.append({
+                    "Rk": opp.id, "Nombre": opp.name, "ELO": opp.elo, 
+                    "Título": opp.title if opp.title else "-", "Fed": opp.federation, "Resultado": "?"
+                })
 
     n = len(opponent_elos)
     if n == 0:
@@ -618,14 +622,21 @@ if uploaded_file is not None:
 
         norm_type = st.radio("¿Qué tipo de norma deseas evaluar?", available_norms, horizontal=True)
 
-        add_opp = st.checkbox("¿Deseas añadir un rival extra manualmente para cálculos hipotéticos?")
-        last_opp = None
-        if add_opp:
-            last_opponent_id = st.selectbox("Selecciona el rival adicional:", options=list(player_options.keys()), format_func=lambda x: player_options[x], key="last_rival")
-            last_opp = get_player(last_opponent_id, players)
+        # MODIFICADO: Selector numérico (0, 1 o 2 rivales) para cálculos hipotéticos
+        num_hypothetical = st.selectbox("¿Cuántos rivales hipotéticos extra deseas añadir?", [0, 1, 2], index=0)
+        
+        hypothetical_opps = []
+        if num_hypothetical >= 1:
+            opp1_id = st.selectbox("Selecciona el 1º rival adicional:", options=list(player_options.keys()), format_func=lambda x: player_options[x], key="rival_1")
+            hypothetical_opps.append(get_player(opp1_id, players))
+            
+        if num_hypothetical == 2:
+            opp2_id = st.selectbox("Selecciona el 2º rival adicional:", options=list(player_options.keys()), format_func=lambda x: player_options[x], key="rival_2")
+            hypothetical_opps.append(get_player(opp2_id, players))
 
         if norm_p:
-            res = evaluate_norm(norm_p, norm_type, players, last_opp, tournament_exemption)
+            # MODIFICADO: Pasamos la lista 'hypothetical_opps' en vez de 'last_opp'
+            res = evaluate_norm(norm_p, norm_type, players, hypothetical_opps, tournament_exemption)
             
             if res is None:
                 st.error("El jugador seleccionado no posee partidas válidas computables.")
