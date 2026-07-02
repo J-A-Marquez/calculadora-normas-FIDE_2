@@ -23,7 +23,6 @@ class Player:
         self.title = title
         self.federation = federation
         self.matches = []
-        # NUEVO: Detección automática inicial basada en el título
         self.is_female = title in ["WGM", "WIM", "WFM", "WCM"]
 
 def get_title_rank(title):
@@ -54,7 +53,6 @@ def get_player(player_id, players):
             return p
     return None
 
-# Tabla p-dp integrada (Conversión oficial FIDE)
 dp_table = {
     100: 800, 99: 677, 98: 589, 97: 538, 96: 501, 95: 470, 94: 444, 93: 422, 92: 401, 91: 383,
     90: 366, 89: 351, 88: 336, 87: 322, 86: 309, 85: 296, 84: 284, 83: 273, 82: 262, 81: 251,
@@ -73,8 +71,6 @@ dp_table = {
 # LÓGICA DE CÁLCULO FIDE
 # =========================================================
 def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemption=False):
-    """Evalúa las condiciones matemáticas de una norma para un jugador dado."""
-    
     if norm_type == "GM":
         target_rank, elo_threshold, elo_target, target_performance = 6, 2200, 2380, 2599.5
     elif norm_type == "IM":
@@ -94,13 +90,11 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
     actual_score = 0.0
     opponent_details = []
 
-    # Partidas reales
     for m in norm_p.matches:
         if m.opponent > 0 and m.color != "F" and not m.special:
             opp = get_player(m.opponent, players)
             if opp:
                 opponent_elos.append(opp.elo)
-                
                 rank = get_title_rank(opp.title)
                 if rank > 0:
                     valid_titles_total += 1
@@ -124,10 +118,8 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
                     "Título": opp.title if opp.title else "-", "Fed": opp.federation, "Resultado": res_str
                 })
 
-    # Rival hipotético añadido
     if last_opp:
         opponent_elos.append(last_opp.elo)
-        
         rank = get_title_rank(last_opp.title)
         if rank > 0:
             valid_titles_total += 1
@@ -147,7 +139,6 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
     if n == 0:
         return None
 
-    # Umbral FIDE (Floor limit)
     elo_adjusted = False
     original_min_elo = 0
     min_elo = min(opponent_elos)
@@ -158,17 +149,14 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
         opponent_elos[min_idx] = elo_threshold
         elo_adjusted = True
 
-    # ELO Medio
     avg_elo = sum(opponent_elos) / n
     max_freq = max(federation_counts.values()) if federation_counts else 0
 
-    # Cálculo de la performance
     actual_p = actual_score / n if n > 0 else 0
     actual_p_idx = max(0, min(100, int(round(actual_p * 100.0))))
     actual_dp = dp_table.get(actual_p_idx, 0)
     actual_performance = round(avg_elo + actual_dp + 1e-9)
 
-    # Cálculo de la puntuación mínima requerida
     min_required_score = -1.0
     s = 0.0
     while s <= n:
@@ -180,13 +168,10 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
             break
         s += 0.5
 
-    # Evaluación de condiciones
     req_cat_min = max(3, math.ceil(n / 3.0))
     req_tot_min = math.ceil(n / 2.0)
     req_fed_player_max = math.floor(n * 3.0 / 5.0)
     req_fed_any_max = math.floor(n * 2.0 / 3.0)
-    
-    # Excepción torneo internacional
     req_fed_diff_min = 1 if tournament_exemption else 3
 
     cond_elo = avg_elo >= elo_target
@@ -213,13 +198,11 @@ def evaluate_norm(norm_p, norm_type, players, last_opp=None, tournament_exemptio
     }
 
 def scan_all_players_for_norms(players_list, include_womens_titles=True, tournament_exemption=False):
-    """Escanea a todos los jugadores y devuelve las normas conseguidas."""
     successful_candidates = []
     title_hierarchy = {"GM": 4, "IM": 3, "WGM": 2, "WIM": 1, "": 0, "FM": 0, "WFM": 0, "CM": 0, "WCM": 0}
     
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
-        
         if len(valid_matches) < 8: 
             continue
             
@@ -229,7 +212,6 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True, tournam
         if player_title_level < 4: norms_to_test.append("GM")
         if player_title_level < 3: norms_to_test.append("IM")
         
-        # NUEVO: Validamos que la persona sea mujer además del toggle global
         if include_womens_titles and p.is_female:
             if player_title_level < 2: norms_to_test.append("WGM")
             if player_title_level < 1: norms_to_test.append("WIM")
@@ -249,9 +231,9 @@ def scan_all_players_for_norms(players_list, include_womens_titles=True, tournam
                 
     return successful_candidates
 
+
+# --- FUNCIÓN A FALTA DE 1 RONDA ---
 def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=False):
-    """Estima qué necesita un jugador en la última ronda para conseguir norma."""
-    
     if norm_type == "GM":
         target_rank, elo_threshold, elo_target, target_performance = 6, 2200, 2380, 2599.5
     elif norm_type == "IM":
@@ -260,8 +242,7 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
         target_rank, elo_threshold, elo_target, target_performance = 4, 2000, 2180, 2399.5
     elif norm_type == "WIM":
         target_rank, elo_threshold, elo_target, target_performance = 3, 1850, 2030, 2249.5
-    else:
-        return None
+    else: return None
 
     opponent_elos = []
     valid_titles_total = 0
@@ -290,33 +271,24 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
     if n_current == 0: return None
     n_target = n_current + 1
 
-    # Límites proyectados para n+1 partidas
     req_cat_min = max(3, math.ceil(n_target / 3.0))
     req_tot_min = math.ceil(n_target / 2.0)
     req_fed_player_max = math.floor(n_target * 3.0 / 5.0)
     req_fed_any_max = math.floor(n_target * 2.0 / 3.0)
-    
-    # Excepción torneo internacional
     req_fed_diff_min = 1 if tournament_exemption else 3
 
     missing_cat = max(0, req_cat_min - category_titles)
     missing_tot = max(0, req_tot_min - valid_titles_total)
     
-    if missing_cat > 1 or missing_tot > 1:
-        return None 
-        
-    if same_fed_as_player > req_fed_player_max: 
-        return None
+    if missing_cat > 1 or missing_tot > 1: return None 
+    if same_fed_as_player > req_fed_player_max: return None
         
     max_freq_current = max(federation_counts.values()) if federation_counts else 0
-    if max_freq_current > req_fed_any_max: 
-        return None
+    if max_freq_current > req_fed_any_max: return None
 
     req_title = "-"
-    if missing_cat == 1:
-        req_title = f"Tit. {norm_type}+"
-    elif missing_tot == 1:
-        req_title = "Tit. Cualquiera"
+    if missing_cat == 1: req_title = f"Tit. {norm_type}+"
+    elif missing_tot == 1: req_title = "Tit. Cualquiera"
 
     req_fed = "-"
     forbidden_feds = []
@@ -329,15 +301,11 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
             if fed not in forbidden_feds:
                 forbidden_feds.append(fed)
 
-    if len(federation_counts) < req_fed_diff_min - 1:
-        return None
-    elif len(federation_counts) == req_fed_diff_min - 1:
-        req_fed = "Fed. Nueva"
+    if len(federation_counts) < req_fed_diff_min - 1: return None
+    elif len(federation_counts) == req_fed_diff_min - 1: req_fed = "Fed. Nueva"
     elif forbidden_feds:
-        if norm_p.federation in forbidden_feds and len(forbidden_feds) == 1:
-            req_fed = "Extranjero"
-        else:
-            req_fed = f"Evitar: {', '.join(forbidden_feds)}"
+        if norm_p.federation in forbidden_feds and len(forbidden_feds) == 1: req_fed = "Extranjero"
+        else: req_fed = f"Evitar: {', '.join(forbidden_feds)}"
 
     def get_min_elo_for_score(res):
         target_score = actual_score + res
@@ -357,27 +325,21 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
             avg = sum(elos) / n_target
             perf = round(avg + dp + 1e-9)
             
-            if avg >= elo_target and perf >= target_performance:
-                return test_elo
+            if avg >= elo_target and perf >= target_performance: return test_elo
         return None
 
     min_elo_win = get_min_elo_for_score(1.0)
     min_elo_draw = get_min_elo_for_score(0.5)
     min_elo_loss = get_min_elo_for_score(0.0)
 
-    if min_elo_win is None:
-        return None
+    if min_elo_win is None: return None
 
     result_needs = []
-    if min_elo_loss is not None:
-        result_needs.append(f"Derrota (ELO ≥ {min_elo_loss})")
-    if min_elo_draw is not None:
-        result_needs.append(f"Tablas (ELO ≥ {min_elo_draw})")
-    if min_elo_win is not None:
-        result_needs.append(f"Victoria (ELO ≥ {min_elo_win})")
+    if min_elo_loss is not None: result_needs.append(f"Derrota (ELO ≥ {min_elo_loss})")
+    if min_elo_draw is not None: result_needs.append(f"Tablas (ELO ≥ {min_elo_draw})")
+    if min_elo_win is not None: result_needs.append(f"Victoria (ELO ≥ {min_elo_win})")
 
-    if not result_needs:
-        return None
+    if not result_needs: return None
 
     return {
         "Rk": norm_p.id,
@@ -385,30 +347,168 @@ def get_candidate_requirements(norm_p, norm_type, players, tournament_exemption=
         "Ptos": actual_score,
         "Norma": norm_type,
         "Resultado necesario": " / ".join(result_needs),
-        "Título Rival": req_title,
-        "Bandera Rival": req_fed
+        "Títulos req.": req_title,
+        "Banderas req.": req_fed
     }
 
-def scan_candidates_for_norms(players_list, include_womens_titles=True, tournament_exemption=False):
+# --- FUNCIÓN A FALTA DE 2 RONDAS ---
+def get_candidate_requirements_2_rounds(norm_p, norm_type, players, tournament_exemption=False):
+    if norm_type == "GM":
+        target_rank, elo_threshold, elo_target, target_performance = 6, 2200, 2380, 2599.5
+    elif norm_type == "IM":
+        target_rank, elo_threshold, elo_target, target_performance = 5, 2050, 2230, 2449.5
+    elif norm_type == "WGM":
+        target_rank, elo_threshold, elo_target, target_performance = 4, 2000, 2180, 2399.5
+    elif norm_type == "WIM":
+        target_rank, elo_threshold, elo_target, target_performance = 3, 1850, 2030, 2249.5
+    else: return None
+
+    opponent_elos = []
+    valid_titles_total = 0
+    category_titles = 0
+    federation_counts = {}
+    same_fed_as_player = 0
+    actual_score = 0.0
+
+    for m in norm_p.matches:
+        if m.opponent > 0 and m.color != "F" and not m.special:
+            opp = get_player(m.opponent, players)
+            if opp:
+                opponent_elos.append(opp.elo)
+                rank = get_title_rank(opp.title)
+                if rank > 0:
+                    valid_titles_total += 1
+                    if rank >= target_rank:
+                        category_titles += 1
+                federation_counts[opp.federation] = federation_counts.get(opp.federation, 0) + 1
+                if opp.federation == norm_p.federation:
+                    same_fed_as_player += 1
+                if m.result == "+": actual_score += 1.0
+                elif m.result == "=": actual_score += 0.5
+
+    n_current = len(opponent_elos)
+    if n_current == 0: return None
+    n_target = n_current + 2
+
+    req_cat_min = max(3, math.ceil(n_target / 3.0))
+    req_tot_min = math.ceil(n_target / 2.0)
+    req_fed_player_max = math.floor(n_target * 3.0 / 5.0)
+    req_fed_any_max = math.floor(n_target * 2.0 / 3.0)
+    req_fed_diff_min = 1 if tournament_exemption else 3
+
+    missing_cat = max(0, req_cat_min - category_titles)
+    missing_tot = max(0, req_tot_min - valid_titles_total)
+    
+    if missing_cat > 2 or missing_tot > 2: return None 
+
+    # Determinación de los títulos requeridos combinados
+    req_title_list = []
+    c = missing_cat
+    t = missing_tot
+    if c == 2: req_title_list.append(f"2x Tit. {norm_type}+")
+    elif c == 1:
+        req_title_list.append(f"1x Tit. {norm_type}+")
+        if t >= 2: req_title_list.append("1x Tit. Cualquiera")
+    elif c == 0:
+        if t == 2: req_title_list.append("2x Tit. Cualquiera")
+        elif t == 1: req_title_list.append("1x Tit. Cualquiera")
+    req_title = " + ".join(req_title_list) if req_title_list else "-"
+
+    # Determinación de las banderas requeridas combinadas
+    forbidden_feds_any = []
+    forbidden_feds_both = []
+
+    if same_fed_as_player + 1 > req_fed_player_max: forbidden_feds_any.append(norm_p.federation)
+    elif same_fed_as_player + 2 > req_fed_player_max: forbidden_feds_both.append(norm_p.federation)
+
+    for fed, count in federation_counts.items():
+        if count + 1 > req_fed_any_max and fed not in forbidden_feds_any:
+            forbidden_feds_any.append(fed)
+        elif count + 2 > req_fed_any_max and fed not in forbidden_feds_both and fed not in forbidden_feds_any:
+            forbidden_feds_both.append(fed)
+
+    req_fed_parts = []
+    if len(federation_counts) < req_fed_diff_min - 2: return None
+    elif len(federation_counts) == req_fed_diff_min - 2: req_fed_parts.append("2 Feds. Nuevas")
+    elif len(federation_counts) == req_fed_diff_min - 1: req_fed_parts.append("1 Fed. Nueva")
+
+    if forbidden_feds_any: req_fed_parts.append(f"Evitar: {','.join(forbidden_feds_any)}")
+    if forbidden_feds_both: req_fed_parts.append(f"Máx 1 de: {','.join(forbidden_feds_both)}")
+    
+    req_fed = " | ".join(req_fed_parts) if req_fed_parts else "-"
+
+    # Busca la media de ELO necesaria para los 2 siguientes oponentes
+    def get_min_avg_elo_for_score(res):
+        target_score = actual_score + res
+        p_val = target_score / n_target
+        p_idx = max(0, min(100, int(round(p_val * 100.0))))
+        dp = dp_table.get(p_idx, 0)
+        
+        for test_avg_elo in range(1400, 3000):
+            elos = opponent_elos.copy()
+            elos.append(test_avg_elo)
+            elos.append(test_avg_elo)
+            
+            min_elo_val = min(elos)
+            if min_elo_val < elo_threshold:
+                min_idx = elos.index(min_elo_val)
+                elos[min_idx] = elo_threshold
+                
+            avg = sum(elos) / n_target
+            perf = round(avg + dp + 1e-9)
+            
+            if avg >= elo_target and perf >= target_performance: return test_avg_elo
+        return None
+
+    scenarios = [
+        (2.0, "2V"), (1.5, "1V+1T"), (1.0, "1V+1D o 2T"), 
+        (0.5, "1T+1D"), (0.0, "2D")
+    ]
+
+    result_needs = []
+    for pts, label in scenarios:
+        min_elo = get_min_avg_elo_for_score(pts)
+        if min_elo is not None:
+            result_needs.append(f"{label} (Med. ELO ≥ {min_elo})")
+
+    if not result_needs: return None
+
+    return {
+        "Rk": norm_p.id,
+        "Jugador": norm_p.name,
+        "Ptos": actual_score,
+        "Norma": norm_type,
+        "Resultado necesario": " / ".join(result_needs),
+        "Títulos req.": req_title,
+        "Banderas req.": req_fed
+    }
+
+
+def scan_candidates_for_norms(players_list, include_womens_titles=True, tournament_exemption=False, rounds_to_go=1):
     candidates = []
     title_hierarchy = {"GM": 4, "IM": 3, "WGM": 2, "WIM": 1, "": 0, "FM": 0, "WFM": 0, "CM": 0, "WCM": 0}
     
     for p in players_list:
         valid_matches = [m for m in p.matches if m.opponent > 0 and m.color != "F" and not m.special]
-        if len(valid_matches) < 8: continue
+        
+        # Filtramos a los que no tienen suficientes rondas según la estimación
+        if len(valid_matches) < (9 - rounds_to_go): continue
             
         player_title_level = title_hierarchy.get(p.title, 0)
         norms_to_test = []
         if player_title_level < 4: norms_to_test.append("GM")
         if player_title_level < 3: norms_to_test.append("IM")
         
-        # NUEVO: Comprobamos si es mujer antes de añadir los tests de WGM/WIM
         if include_womens_titles and p.is_female:
             if player_title_level < 2: norms_to_test.append("WGM")
             if player_title_level < 1: norms_to_test.append("WIM")
             
         for norm_type in norms_to_test:
-            reqs = get_candidate_requirements(p, norm_type, players_list, tournament_exemption=tournament_exemption)
+            if rounds_to_go == 1:
+                reqs = get_candidate_requirements(p, norm_type, players_list, tournament_exemption=tournament_exemption)
+            else:
+                reqs = get_candidate_requirements_2_rounds(p, norm_type, players_list, tournament_exemption=tournament_exemption)
+                
             if reqs:
                 candidates.append(reqs)
                 
@@ -456,7 +556,7 @@ if uploaded_file is not None:
     st.success("¡Archivo cargado correctamente!")
     
     # -----------------------------------------------------
-    # NUEVO: INTERFAZ PARA DEFINIR JUGADORAS FEMENINAS
+    # GESTIÓN FEMENINA Y EXCEPCIONES 
     # -----------------------------------------------------
     st.markdown("---")
     st.write("### 👩 Gestión de Categoría Femenina")
@@ -472,23 +572,17 @@ if uploaded_file is not None:
         format_func=lambda x: player_options_dict[x]
     )
     
-    # Actualizamos el objeto Player según la selección del usuario
     for p in players:
         p.is_female = (p.id in selected_female_ids)
     
-    # -----------------------------------------------------
-    # CÁLCULO DE LA EXCEPCIÓN FIDE (TORNEOS INTERNACIONALES)
-    # -----------------------------------------------------
     st.markdown("---")
     st.write("### 🌍 Configuración y Normativa del Torneo")
     
-    # Inferimos la federación organizadora por mayoría
     all_feds = [p.federation for p in players]
     inferred_host_fed = max(set(all_feds), key=all_feds.count) if all_feds else ""
     
     host_fed = st.text_input("Federación organizadora (Host Federation):", value=inferred_host_fed, max_chars=3)
     
-    # Evaluamos la excepción
     foreign_rated_players = [p for p in players if p.federation != host_fed and p.elo > 0]
     foreign_feds = set(p.federation for p in foreign_rated_players)
     wim_plus_titles = {"GM", "IM", "WGM", "WIM"}
@@ -506,7 +600,7 @@ if uploaded_file is not None:
     tab_individual, tab_escaner, tab_candidatos = st.tabs([
         "🔍 Búsqueda Individual", 
         "🚀 Normas Cumplidas", 
-        "🔮 Estimación Última Ronda"
+        "🔮 Estimación Próximas Rondas"
     ])
 
     # -----------------------------------------------------
@@ -518,7 +612,6 @@ if uploaded_file is not None:
         norm_player_id = st.selectbox("Selecciona el jugador que busca la norma:", options=list(player_options.keys()), format_func=lambda x: player_options[x])
         norm_p = get_player(norm_player_id, players)
 
-        # NUEVO: Solo muestra normas femeninas si el jugador está marcado como mujer
         available_norms = ["GM", "IM"]
         if norm_p and norm_p.is_female:
             available_norms.extend(["WGM", "WIM"])
@@ -595,35 +688,49 @@ if uploaded_file is not None:
                 
             if len(candidates) > 0:
                 st.success(f"¡Se han detectado {len(candidates)} normas cumplidas!")
-
                 df = pd.DataFrame(candidates)
                 st.dataframe(df, use_container_width=True, hide_index=True)
             else:
                 st.warning("No se ha detectado ninguna norma completada en este torneo.")
 
     # -----------------------------------------------------
-    # PESTAÑA 3: ESTIMACIÓN ÚLTIMA RONDA (CANDIDATOS)
+    # PESTAÑA 3: ESTIMACIÓN PRÓXIMAS RONDAS (CANDIDATOS)
     # -----------------------------------------------------
     with tab_candidatos:
-        st.write("### 🔮 Candidatos a falta de 1 ronda")
-        st.write("Identifica a los jugadores que aún no tienen norma, pero que **podrían conseguirla si juegan una partida más**. Útil antes de publicar los emparejamientos de la última ronda para saber a quién hacerle seguimiento.")
+        st.write("### 🔮 Candidatos a norma")
+        st.write("Identifica a los jugadores que aún no tienen norma, pero que **podrían conseguirla** sumando los resultados de las próximas rondas (útil antes de los últimos emparejamientos).")
         
-        modo_escaner_cand = st.radio(
-            "Selecciona el tipo de análisis:",
-            ["Análisis Completo (GM, IM, WGM, WIM)", "Solo Títulos Absolutos (GM, IM)"],
-            horizontal=True,
-            key="radio_candidatos"
-        )
+        col1, col2 = st.columns([2, 1])
         
+        with col1:
+            modo_escaner_cand = st.radio(
+                "Selecciona el tipo de análisis:",
+                ["Análisis Completo (GM, IM, WGM, WIM)", "Solo Títulos Absolutos (GM, IM)"],
+                horizontal=True,
+                key="radio_candidatos"
+            )
+            
+        with col2:
+            rondas_restantes = st.radio(
+                "¿Cuántas rondas quedan?",
+                [1, 2],
+                format_func=lambda x: f"A falta de {x} ronda(s)"
+            )
+            
         incluir_femeninos_cand = (modo_escaner_cand == "Análisis Completo (GM, IM, WGM, WIM)")
         
         if st.button("Buscar candidatos", type="primary"):
-            with st.spinner('Proyectando escenarios para la última ronda...'):
-                future_candidates = scan_candidates_for_norms(players, include_womens_titles=incluir_femeninos_cand, tournament_exemption=tournament_exemption)
+            with st.spinner(f'Proyectando escenarios a falta de {rondas_restantes} ronda(s)...'):
+                future_candidates = scan_candidates_for_norms(
+                    players, 
+                    include_womens_titles=incluir_femeninos_cand, 
+                    tournament_exemption=tournament_exemption, 
+                    rounds_to_go=rondas_restantes
+                )
                 
             if len(future_candidates) > 0:
-                st.info(f"Se han encontrado {len(future_candidates)} jugadores con opciones matemáticas en la próxima ronda.")
+                st.info(f"Se han encontrado {len(future_candidates)} jugadores con opciones matemáticas a falta de {rondas_restantes} ronda(s).")
                 df_future = pd.DataFrame(future_candidates)
                 st.dataframe(df_future, use_container_width=True, hide_index=True)
             else:
-                st.warning("Ningún jugador sin norma actual tiene opciones matemáticas de alcanzarla jugando una ronda más.")
+                st.warning(f"Ningún jugador sin norma actual tiene opciones matemáticas de alcanzarla jugando {rondas_restantes} ronda(s) más.")
